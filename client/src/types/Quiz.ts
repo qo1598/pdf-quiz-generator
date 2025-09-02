@@ -4,6 +4,7 @@ export interface MultipleChoiceQuiz {
   options: string[];
   correctAnswer: number;
   explanation: string;
+  pageReference?: string;
 }
 
 export interface SubjectiveQuiz {
@@ -11,6 +12,7 @@ export interface SubjectiveQuiz {
   question: string;
   correctAnswer: string;
   explanation: string;
+  pageReference?: string;
   sampleAnswer?: string; // 호환성을 위해 선택적으로 유지
 }
 

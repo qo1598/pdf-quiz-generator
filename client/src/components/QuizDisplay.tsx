@@ -148,9 +148,12 @@ const QuizDisplay: React.FC<QuizDisplayProps> = ({ quizzes, quizId }) => {
                       </div>
                     ))}
                   </div>
-                  <p className="text-sm text-gray-600">
-                    <strong>설명:</strong> {quiz.explanation}
-                  </p>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p><strong>설명:</strong> {quiz.explanation}</p>
+                    {quiz.pageReference && (
+                      <p className="text-blue-600"><strong>출처:</strong> {quiz.pageReference}</p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -162,9 +165,12 @@ const QuizDisplay: React.FC<QuizDisplayProps> = ({ quizzes, quizId }) => {
                     <strong>정답:</strong>
                     <p>{quiz.correctAnswer}</p>
                   </div>
-                  <p className="text-sm text-gray-600">
-                    <strong>설명:</strong> {quiz.explanation}
-                  </p>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p><strong>설명:</strong> {quiz.explanation}</p>
+                    {quiz.pageReference && (
+                      <p className="text-blue-600"><strong>출처:</strong> {quiz.pageReference}</p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

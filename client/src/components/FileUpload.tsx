@@ -15,6 +15,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quizType, setQuizType] = useState<string>('mixed');
+  const [questionCount, setQuestionCount] = useState<number>(10);
+  const [difficulty, setDifficulty] = useState<string>('medium');
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +66,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
       const formData = new FormData();
       formData.append('pdf', selectedFile);
       formData.append('quizType', quizType);
+      formData.append('questionCount', questionCount.toString());
+      formData.append('difficulty', difficulty);
 
       const response = await fetch(API_ENDPOINTS.GENERATE_QUIZ, {
         method: 'POST',
@@ -170,6 +174,66 @@ const FileUpload: React.FC<FileUploadProps> = ({
               className="mr-2"
             />
             <span>주관식만</span>
+          </label>
+        </div>
+      </div>
+
+      {/* 문항 수 선택 */}
+      <div className="mt-6">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          출제 문항 수
+        </label>
+        <div className="flex space-x-4">
+          {[5, 10, 15, 20].map((count) => (
+            <label key={count} className="flex items-center">
+              <input
+                type="radio"
+                value={count}
+                checked={questionCount === count}
+                onChange={(e) => setQuestionCount(Number(e.target.value))}
+                className="mr-2"
+              />
+              <span>{count}문제</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* 난이도 선택 */}
+      <div className="mt-6">
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          문제 난이도
+        </label>
+        <div className="flex space-x-4">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="easy"
+              checked={difficulty === 'easy'}
+              onChange={(e) => setDifficulty(e.target.value)}
+              className="mr-2"
+            />
+            <span className="text-green-600">하 (기초)</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="medium"
+              checked={difficulty === 'medium'}
+              onChange={(e) => setDifficulty(e.target.value)}
+              className="mr-2"
+            />
+            <span className="text-yellow-600">중 (표준)</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="hard"
+              checked={difficulty === 'hard'}
+              onChange={(e) => setDifficulty(e.target.value)}
+              className="mr-2"
+            />
+            <span className="text-red-600">상 (심화)</span>
           </label>
         </div>
       </div>

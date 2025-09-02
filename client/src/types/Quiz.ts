@@ -9,7 +9,9 @@ export interface MultipleChoiceQuiz {
 export interface SubjectiveQuiz {
   type: 'subjective';
   question: string;
-  sampleAnswer: string;
+  correctAnswer: string;
+  explanation: string;
+  sampleAnswer?: string; // 호환성을 위해 선택적으로 유지
 }
 
 export type Quiz = MultipleChoiceQuiz | SubjectiveQuiz;

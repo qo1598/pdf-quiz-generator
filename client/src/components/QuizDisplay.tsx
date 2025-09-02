@@ -84,9 +84,16 @@ const QuizDisplay: React.FC<QuizDisplayProps> = ({ quizzes, quizId }) => {
     let total = 0;
 
     quizzes.forEach((quiz, index) => {
+      total++;
       if (quiz.type === 'multiple') {
-        total++;
         if (selectedAnswers[index] === quiz.correctAnswer) {
+          correct++;
+        }
+      } else if (quiz.type === 'subjective') {
+        const userAnswer = subjectiveAnswers[index]?.trim().toLowerCase() || '';
+        const correctAnswer = quiz.correctAnswer.trim().toLowerCase();
+        // 정확한 일치 또는 부분 일치로 검사
+        if (userAnswer === correctAnswer || userAnswer.includes(correctAnswer)) {
           correct++;
         }
       }
@@ -110,7 +117,7 @@ const QuizDisplay: React.FC<QuizDisplayProps> = ({ quizzes, quizId }) => {
             {percentage}%
           </div>
           <p className="text-lg text-gray-600">
-            객관식 {correct}/{total} 정답
+            총 {correct}/{total} 정답
           </p>
         </div>
 
@@ -151,10 +158,13 @@ const QuizDisplay: React.FC<QuizDisplayProps> = ({ quizzes, quizId }) => {
                     <strong>내 답변:</strong>
                     <p>{subjectiveAnswers[index] || '답변하지 않음'}</p>
                   </div>
-                  <div className="bg-blue-50 p-3 rounded">
-                    <strong>모범 답안:</strong>
-                    <p>{quiz.sampleAnswer}</p>
+                  <div className="bg-green-50 p-3 rounded mb-3">
+                    <strong>정답:</strong>
+                    <p>{quiz.correctAnswer}</p>
                   </div>
+                  <p className="text-sm text-gray-600">
+                    <strong>설명:</strong> {quiz.explanation}
+                  </p>
                 </div>
               )}
             </div>

@@ -1,6 +1,12 @@
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const { createClient } = require('@supabase/supabase-js');
+const OpenAI = require('openai');
+
+// OpenAI 클라이언트 초기화
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 // Supabase 클라이언트 초기화
 const supabase = createClient(
@@ -33,8 +39,92 @@ async function extractTextFromPDF(buffer) {
   }
 }
 
-// 퀴즈 생성 함수
-async function generateQuiz(text, quizType = 'mixed') {
+// OpenAI를 사용한 퀴즈 생성 함수
+async function generateQuizWithAI(text, quizType = 'mixed') {
+  try {
+    const prompt = createQuizPrompt(text, quizType);
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        {
+          role: "system",
+          content: "당신은 교육 전문가입니다. 주어진 텍스트를 바탕으로 고품질의 퀴즈를 생성해주세요. 응답은 반드시 JSON 형태로 해주세요."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 2000,
+      temperature: 0.7,
+    });
+
+    const response = completion.choices[0].message.content;
+    return JSON.parse(response);
+  } catch (error) {
+    console.error('OpenAI API 오류:', error);
+    // 폴백: 간단한 퀴즈 생성
+    return generateFallbackQuiz(text, quizType);
+  }
+}
+
+// 퀴즈 생성 프롬프트 작성
+function createQuizPrompt(text, quizType) {
+  const basePrompt = `다음 텍스트를 바탕으로 퀴즈를 생성해주세요:
+
+텍스트:
+${text.substring(0, 1500)}...
+
+요구사항:
+- 응답은 반드시 JSON 형태로 해주세요
+- quizzes 배열 안에 문제들을 포함해주세요
+`;
+
+  if (quizType === 'multiple' || quizType === 'mixed') {
+    return basePrompt + `
+객관식 문제 3개를 생성해주세요:
+- type: "multiple"
+- question: "문제"
+- options: ["선택지1", "선택지2", "선택지3", "선택지4"]
+- correctAnswer: 정답 인덱스 (0-3)
+- explanation: "해설"
+
+${quizType === 'mixed' ? '주관식 문제 2개도 함께 생성해주세요:' : ''}
+${quizType === 'mixed' ? `- type: "subjective"
+- question: "핵심 단어에 빈칸을 넣은 문제 (예: '___은/는 중요한 개념이다')"
+- correctAnswer: "빈칸에 들어갈 정답"
+- explanation: "해설"` : ''}
+
+JSON 형태:
+{
+  "quizzes": [
+    // 퀴즈 배열
+  ]
+}`;
+  }
+
+  if (quizType === 'subjective') {
+    return basePrompt + `
+주관식 문제 5개를 생성해주세요:
+- type: "subjective"
+- question: "핵심 단어에 빈칸을 넣은 문제 (예: '___은/는 중요한 개념이다')"
+- correctAnswer: "빈칸에 들어갈 정답"
+- explanation: "해설"
+
+JSON 형태:
+{
+  "quizzes": [
+    // 퀴즈 배열
+  ]
+}`;
+  }
+
+  return basePrompt;
+}
+
+// 폴백 퀴즈 생성 (OpenAI 실패 시)
+function generateFallbackQuiz(text, quizType) {
   const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 20);
   const quizzes = [];
 
@@ -43,37 +133,49 @@ async function generateQuiz(text, quizType = 'mixed') {
     for (let i = 0; i < Math.min(3, sentences.length); i++) {
       const sentence = sentences[i].trim();
       if (sentence.length > 30) {
+        // 문장에서 핵심 단어 추출
+        const words = sentence.split(' ').filter(word => word.length > 3);
+        const keyWord = words[Math.floor(Math.random() * words.length)] || '중요한 내용';
+        
         quizzes.push({
           type: 'multiple',
-          question: `다음 중 "${sentence.substring(0, 50)}..."에 대한 설명으로 올바른 것은?`,
+          question: `다음 중 "${sentence.substring(0, 50)}..."에서 언급된 핵심 내용은 무엇입니까?`,
           options: [
-            '정답 옵션 (실제로는 AI가 생성)',
-            '오답 옵션 1',
-            '오답 옵션 2',
-            '오답 옵션 3'
+            keyWord,
+            '다른 선택지 1',
+            '다른 선택지 2',
+            '다른 선택지 3'
           ],
           correctAnswer: 0,
-          explanation: '실제로는 AI가 설명을 생성합니다.'
+          explanation: `정답은 "${keyWord}"입니다. 본문에서 이에 대해 설명하고 있습니다.`
         });
       }
     }
   }
 
-  // 주관식 퀴즈 생성
+  // 주관식 퀴즈 생성 (빈칸 채우기 형태)
   if (quizType === 'subjective' || quizType === 'mixed') {
     for (let i = 0; i < Math.min(2, sentences.length); i++) {
       const sentence = sentences[i].trim();
       if (sentence.length > 30) {
-        quizzes.push({
-          type: 'subjective',
-          question: `"${sentence.substring(0, 50)}..."에 대해 설명하세요.`,
-          sampleAnswer: '실제로는 AI가 모범 답안을 생성합니다.'
-        });
+        // 문장에서 핵심 단어를 빈칸으로 만들기
+        const words = sentence.split(' ').filter(word => word.length > 3);
+        if (words.length > 0) {
+          const keyWord = words[Math.floor(Math.random() * words.length)];
+          const questionSentence = sentence.replace(keyWord, '___');
+          
+          quizzes.push({
+            type: 'subjective',
+            question: `다음 빈칸에 들어갈 알맞은 단어를 쓰세요: "${questionSentence.substring(0, 100)}${questionSentence.length > 100 ? '...' : ''}"`,
+            correctAnswer: keyWord,
+            explanation: `정답은 "${keyWord}"입니다.`
+          });
+        }
       }
     }
   }
 
-  return quizzes;
+  return { quizzes };
 }
 
 // 퀴즈를 Supabase에 저장
@@ -128,6 +230,7 @@ export default async function handler(req, res) {
     const { quizType = 'mixed' } = req.body;
 
     // PDF에서 텍스트 추출
+    console.log('PDF 텍스트 추출 중...');
     const extractedText = await extractTextFromPDF(req.file.buffer);
     
     if (!extractedText || extractedText.trim().length < 100) {
@@ -136,8 +239,16 @@ export default async function handler(req, res) {
       });
     }
 
-    // 퀴즈 생성
-    const quizzes = await generateQuiz(extractedText, quizType);
+    console.log(`추출된 텍스트 길이: ${extractedText.length}자`);
+
+    // AI를 사용한 퀴즈 생성
+    console.log('AI 퀴즈 생성 중...');
+    const quizResult = await generateQuizWithAI(extractedText, quizType);
+    const quizzes = quizResult.quizzes || [];
+
+    if (quizzes.length === 0) {
+      return res.status(500).json({ error: '퀴즈 생성에 실패했습니다.' });
+    }
 
     // Supabase에 저장
     const savedQuiz = await saveQuizToDatabase({
@@ -145,6 +256,8 @@ export default async function handler(req, res) {
       quiz_type: quizType,
       text_length: extractedText.length
     }, req.file.originalname);
+
+    console.log(`퀴즈 생성 완료: ${quizzes.length}개 문제`);
 
     res.json({
       success: true,
@@ -155,6 +268,6 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('퀴즈 생성 오류:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || '퀴즈 생성 중 오류가 발생했습니다.' });
   }
 }
